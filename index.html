@@ -171,6 +171,7 @@
 <!-- SETUP -->
 <div id="setup-screen" class="screen">
   <div class="setup-box">
+    <button type="button" id="setup-back-btn" class="hidden" style="background:transparent; border:1px solid var(--g-dim); color:var(--g); padding:6px 12px; font-family:inherit; font-size:0.75rem; cursor:pointer; margin-bottom:14px;">← VOLTAR (sem salvar)</button>
     <h1>V.E.C.N.A.</h1>
     <div class="sub">CONFIGURAÇÃO INICIAL DO SISTEMA</div>
 
@@ -394,6 +395,12 @@
     document.getElementById('pitch-val').textContent = pitchIn.value;
     document.getElementById('rate-val').textContent = rateIn.value;
     populateVoiceSelect();
+    const backBtn = document.getElementById('setup-back-btn');
+    if(get(LS.anthropicKey)){
+      backBtn.classList.remove('hidden');
+    } else {
+      backBtn.classList.add('hidden');
+    }
   }
   document.getElementById('in-pitch').addEventListener('input', (e) => {
     document.getElementById('pitch-val').textContent = e.target.value;
@@ -467,6 +474,12 @@
     bootScreen.classList.add('hidden');
     setupScreen.classList.remove('hidden');
     prefillSetup();
+  });
+
+  document.getElementById('setup-back-btn').addEventListener('click', () => {
+    // Volta pra tela principal sem salvar nenhuma alteração feita nesse formulário.
+    setupScreen.classList.add('hidden');
+    mainScreen.classList.remove('hidden');
   });
 
   function runBoot(){
