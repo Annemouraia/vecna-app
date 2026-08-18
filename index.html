@@ -43,7 +43,7 @@
     padding:9px 10px; font-family:inherit; font-size:0.85rem; outline:none;
   }
   .field input:focus{ border-color:var(--g); box-shadow:0 0 8px var(--g-glow); }
-  .field small{ display:block; color:#2a5a3a; font-size:0.65rem; margin-top:3px; }
+  .field small{ display:block; color:#4a7a9a; font-size:0.65rem; margin-top:3px; }
   .section-tag{ font-size:0.65rem; color:var(--g); border-top:1px dashed var(--g-dim); padding-top:10px; margin:16px 0 10px; letter-spacing:2px; opacity:0.8;}
   #setup-btn{
     width:100%; margin-top:8px; background:transparent; border:1px solid var(--g);
@@ -116,7 +116,7 @@
   #chat-panel.open{ transform:translateX(0); }
   #chat-log{ flex:1; overflow-y:auto; padding:14px; font-size:0.78rem; line-height:1.5; }
   .msg{ margin-bottom:12px; }
-  .msg.user{ color:#6fffb0; }
+  .msg.user{ color:#7fd4ff; }
   .msg.vecna{ color:var(--g); }
   .msg .who{ display:block; font-size:0.62rem; color:var(--g-dim); letter-spacing:1px; margin-bottom:2px;}
   #chat-input-row{ display:flex; border-top:1px solid var(--g-dim); }
@@ -135,7 +135,7 @@
   #sec-panel button{ background:transparent; border:1px solid var(--g-dim); color:var(--g); padding:8px; font-family:inherit; font-size:0.72rem; cursor:pointer; width:100%; margin-bottom:8px; }
   #sec-panel button:hover{ border-color:var(--g); box-shadow:0 0 10px var(--g-glow); }
   #event-log{ flex:1; overflow-y:auto; font-size:0.68rem; border-top:1px dashed var(--g-dim); padding-top:8px; }
-  .evt{ margin-bottom:8px; color:#4fdc8a; }
+  .evt{ margin-bottom:8px; color:#6fc4e8; }
   .evt .t{ color:var(--g-dim); display:block; font-size:0.6rem; }
   .evt.alert{ color:var(--red); }
 
@@ -300,7 +300,10 @@
 
   <!-- Security panel -->
   <div id="sec-panel">
-    <h2>SEGURANÇA</h2>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+      <h2 style="margin:0;">SEGURANÇA</h2>
+      <button id="sec-panel-close" style="background:transparent; border:1px solid var(--g-dim); color:var(--g); width:30px; height:30px; border-radius:50%; cursor:pointer; font-size:1rem;">✕</button>
+    </div>
     <div class="row"><span>Status</span><strong id="sec-panel-status">DESARMADO</strong></div>
     <button id="arm-toggle-btn">ARMAR SISTEMA</button>
     <button id="check-now-btn">VERIFICAR CÂMERA AGORA</button>
@@ -310,6 +313,10 @@
 
   <!-- Chat panel -->
   <div id="chat-panel">
+    <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 14px; border-bottom:1px solid var(--g-dim);">
+      <span style="font-size:0.75rem; letter-spacing:2px;">CHAT</span>
+      <button id="chat-panel-close" style="background:transparent; border:1px solid var(--g-dim); color:var(--g); width:30px; height:30px; border-radius:50%; cursor:pointer; font-size:1rem;">✕</button>
+    </div>
     <div id="chat-log"></div>
     <div id="chat-input-row">
       <input id="chat-input" placeholder="Fale com o VECNA...">
@@ -519,14 +526,14 @@
     say(`Estou online, ${OWNER_CALL}. Sistema de segurança em espera. O que você precisa?`);
   }
 
-  /* ============== ORB ANIMATION (stylized globe + geometric rings, canvas-only, no bitmaps) ============== */
+  /* ============== ORB ANIMATION (stylized wireframe skull + geometric rings, canvas-only, no bitmaps) ============== */
   let orbCtx, orbCanvas, orbT = 0, orbEnergy = 0.65;
 
   function seededRand(i){ return (Math.sin(i*12.9898)*43758.5453) % 1; }
-
-  // --- Procedural "city light" point cloud approximating a couple of glowing landmasses ---
-  // (Not a real map — a stylized suggestion of continents, since we avoid heavy map textures.)
   function seededRand2(i){ const x = Math.sin(i*78.233)*43758.5453; return x - Math.floor(x); }
+
+  // Nuvem de pontos "luzes de cidade" aproximando alguns continentes (estilizado, não é
+  // um mapa real — pra manter leve, sem textura de imagem pesada).
   function buildLandPoints(){
     const blobs = [
       { lat:42, lon:-95, latSpread:26, lonSpread:34, count:280 },  // "América do Norte"
@@ -541,7 +548,6 @@
         seed++;
         const rLat = (seededRand2(seed*2.13)-0.5)*2;
         const rLon = (seededRand2(seed*3.71)-0.5)*2;
-        // bias toward center for a denser core (like city clusters)
         const fall = 1 - Math.pow(Math.max(Math.abs(rLat),Math.abs(rLon)), 1.6);
         if(fall < 0.15) continue;
         const lat = (b.lat + rLat*b.latSpread) * Math.PI/180;
@@ -569,7 +575,7 @@
 
   function col(alpha){ return `rgba(143,214,255,${alpha})`; }
   function colAccent(alpha){ return `rgba(234,246,255,${alpha})`; }
-  function colWarm(alpha){ return `rgba(255,195,120,${alpha})`; }
+  function colWarm(alpha){ return `rgba(255,160,70,${alpha})`; }
 
   // A swirling light-streak ring: a tilted, squashed ellipse drawn as many short fading
   // segments so it reads as a comet-trail / motion-streak rather than a solid line.
@@ -585,8 +591,7 @@
       const a0 = ang, a1 = ang + arcSpan/segCount*0.92;
       orbCtx.beginPath();
       orbCtx.arc(0,0, rx, a0, a1);
-      const warmMix = (s % 7 === 0);
-      orbCtx.strokeStyle = warmMix ? colWarm(alphaBase*fade*0.95) : col(alphaBase*fade);
+      orbCtx.strokeStyle = col(alphaBase*fade);
       orbCtx.lineWidth = (7.8 + 9*fade) * devicePixelRatio;
       orbCtx.lineCap = 'round';
       orbCtx.stroke();
@@ -639,7 +644,7 @@
     const dpr = devicePixelRatio;
     const unit = Math.min(w, h*0.72) * 0.5;
     const energyBoost = 0.55 + orbEnergy*0.6;
-    const gR = unit * 0.46;
+    const gR = unit * 0.5;
 
     // --- Faint background bokeh particles (static, subtle parallax drift) ---
     for(let i=0;i<42;i++){
@@ -648,25 +653,25 @@
       const r = (1+seededRand2(i*3.1)*2.4) * dpr;
       orbCtx.beginPath();
       orbCtx.arc(px, py, r, 0, Math.PI*2);
-      orbCtx.fillStyle = (i%5===0) ? colWarm(0.25) : col(0.18);
+      orbCtx.fillStyle = col(0.18);
       orbCtx.fill();
     }
 
-    // --- Swirling light-streak rings around the globe (rotation motion) ---
+    // --- Swirling light-streak rings (movimento ao redor) ---
     drawAllStreakRings(cx, cy, unit, energyBoost);
 
-    // --- Sphere base (dark navy, subtle gradient for volume) ---
+    // --- Base da esfera (gradiente escuro, volume) ---
     const baseGrad = orbCtx.createRadialGradient(cx-gR*0.35, cy-gR*0.35, gR*0.05, cx, cy, gR);
-    baseGrad.addColorStop(0, `rgba(30,60,95,${0.9*energyBoost})`);
-    baseGrad.addColorStop(0.7, `rgba(8,20,38,${0.92*energyBoost})`);
-    baseGrad.addColorStop(1, `rgba(3,8,16,${0.95*energyBoost})`);
+    baseGrad.addColorStop(0, `rgba(70,45,110,${0.9*energyBoost})`);
+    baseGrad.addColorStop(0.7, `rgba(24,12,45,${0.92*energyBoost})`);
+    baseGrad.addColorStop(1, `rgba(8,4,15,${0.95*energyBoost})`);
     orbCtx.beginPath();
     orbCtx.arc(cx, cy, gR, 0, Math.PI*2);
     orbCtx.fillStyle = baseGrad;
     orbCtx.fill();
 
-    // --- Rotating "city light" landmasses (orthographic projection, front hemisphere only) ---
-    const rot = orbT * 0.22; // velocidade de rotação do globo
+    // --- "Luzes de cidade" girando (projeção ortográfica, só hemisfério da frente) ---
+    const rot = orbT * 0.22;
     orbCtx.save();
     orbCtx.beginPath();
     orbCtx.arc(cx, cy, gR, 0, Math.PI*2);
@@ -683,10 +688,10 @@
       const size = (0.9 + p.br*1.1) * depth * dpr;
       orbCtx.beginPath();
       orbCtx.arc(sx, sy, size, 0, Math.PI*2);
-      orbCtx.fillStyle = p.warm ? colWarm(depth*p.br*energyBoost) : colAccent(depth*p.br*0.85*energyBoost);
+      orbCtx.fillStyle = colAccent(depth*p.br*0.85*energyBoost);
       orbCtx.fill();
     }
-    // faint ocean grid lines for volume
+    // linhas de grade sutis (volume)
     for(let i=-2;i<=2;i++){
       const yy = cy + i*gR*0.34;
       orbCtx.beginPath();
@@ -697,7 +702,7 @@
     }
     orbCtx.restore();
 
-    // --- Atmospheric rim glow ---
+    // --- Brilho de atmosfera ---
     orbCtx.beginPath();
     orbCtx.arc(cx, cy, gR, 0, Math.PI*2);
     orbCtx.strokeStyle = colAccent(0.55*energyBoost);
@@ -843,6 +848,12 @@
   });
   document.getElementById('sec-panel-btn').addEventListener('click', () => {
     secPanel.classList.toggle('open');
+    chatPanel.classList.remove('open');
+  });
+  document.getElementById('sec-panel-close').addEventListener('click', () => {
+    secPanel.classList.remove('open');
+  });
+  document.getElementById('chat-panel-close').addEventListener('click', () => {
     chatPanel.classList.remove('open');
   });
   document.getElementById('chat-send').addEventListener('click', sendFromInput);
