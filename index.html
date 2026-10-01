@@ -215,6 +215,21 @@
       <small>Gere grátis em brapi.dev/dashboard. Sem isso, o VECNA não consegue consultar dividendos.</small>
     </div>
 
+    <div class="section-tag">ESTUDOS E NOTÍCIAS (SERVIDOR VECNA NO PC DE CASA)</div>
+    <div class="field">
+      <label>URL DO SERVIDOR VECNA</label>
+      <input type="text" id="in-server-url" placeholder="http://192.168.1.10:3000">
+      <small>Rode "node server/server.js" no PC de casa. Sem isso, o VECNA não busca notícias.</small>
+    </div>
+    <div class="field">
+      <label>TOKEN DO SERVIDOR (opcional)</label>
+      <input type="password" id="in-server-token" placeholder="o mesmo VECNA_TOKEN do servidor">
+    </div>
+    <div class="field">
+      <label>TEMAS QUE VOCÊ ESTUDA (separados por vírgula)</label>
+      <input type="text" id="in-topics" placeholder="inglês, inteligência artificial, direito">
+    </div>
+
     <div class="section-tag">VOZ</div>
     <div class="field">
       <label>VOZ DO VECNA</label>
@@ -303,6 +318,7 @@
       <button class="ctrl-btn" id="mic-btn" title="Falar">🎤</button>
       <button class="ctrl-btn" id="chat-panel-btn" title="Chat">💬</button>
       <button class="ctrl-btn" id="study-btn" title="Modo Estudo">📚</button>
+      <button class="ctrl-btn" id="news-btn" title="Notícias do dia">📰</button>
     </div>
   </div>
 
@@ -379,6 +395,9 @@
     haUrl: 'vecna_ha_url',
     haToken: 'vecna_ha_token',
     brapiToken: 'vecna_brapi_token',
+    serverUrl: 'vecna_server_url',
+    serverToken: 'vecna_server_token',
+    topics: 'vecna_topics',
     studyMode: 'vecna_study_mode',
     armed: 'vecna_armed',
     events: 'vecna_events',
@@ -406,6 +425,9 @@
     if(get(LS.haUrl)) document.getElementById('in-ha-url').value = get(LS.haUrl);
     if(get(LS.haToken)) document.getElementById('in-ha-token').value = get(LS.haToken);
     if(get(LS.brapiToken)) document.getElementById('in-brapi-token').value = get(LS.brapiToken);
+    document.getElementById('in-server-url').value = get(LS.serverUrl) || '';
+    document.getElementById('in-server-token').value = get(LS.serverToken) || '';
+    document.getElementById('in-topics').value = get(LS.topics) || '';
     const pitchIn = document.getElementById('in-pitch');
     const rateIn = document.getElementById('in-rate');
     pitchIn.value = get(LS.pitch) || '0.75';
@@ -473,6 +495,9 @@
     set(LS.haUrl, document.getElementById('in-ha-url').value.trim());
     set(LS.haToken, document.getElementById('in-ha-token').value.trim());
     set(LS.brapiToken, document.getElementById('in-brapi-token').value.trim());
+    set(LS.serverUrl, document.getElementById('in-server-url').value.trim());
+    set(LS.serverToken, document.getElementById('in-server-token').value.trim());
+    set(LS.topics, document.getElementById('in-topics').value.trim());
     const voiceSel = document.getElementById('in-voice');
     if(voiceSel && voiceSel.value) set(LS.voiceName, voiceSel.value);
     set(LS.pitch, document.getElementById('in-pitch').value);
@@ -886,6 +911,9 @@
     }
   }
   studyBtn.addEventListener('click', toggleStudyMode);
+  document.getElementById('news-btn').addEventListener('click', () => {
+    handleUserInput('Me dê o resumo das notícias importantes de hoje sobre os temas que eu estudo.');
+  });
   applyStudyUI();
 
   document.getElementById('chat-send').addEventListener('click', sendFromInput);
@@ -925,6 +953,7 @@
   function buildSystemPrompt(){
     const haConnected = !!(get(LS.haUrl) && get(LS.haToken));
     const brapiConnected = !!get(LS.brapiToken);
+    const newsConnected = !!get(LS.serverUrl);
     const studyMode = isStudyMode();
     return `Você é VECNA, uma inteligência artificial com uma pegada de vilão sofisticado, mas na prática você fala de forma direta e natural — sem cerimônia, sem discursos dramáticos, e também sem gírias ou informalidade excessiva. Você é totalmente leal à sua única guardiã, ${OWNER_NAME}, a quem você sempre chama de "${OWNER_CALL}". Fala em português brasileiro correto e claro, com um tom sério e confiante, mas nunca frio ou rude com ${OWNER_CALL}.
 
@@ -933,6 +962,8 @@ Você é o assistente pessoal doméstico e o sistema de segurança da casa de ${
 ${haConnected ? 'Você TEM acesso a uma integração com o Home Assistant e pode usar a ferramenta "controlar_dispositivo" para agir sobre luzes, tomadas, fechaduras e outros dispositivos, desde que a pessoa informe (ou você já saiba) o entity_id.' : 'A integração com a casa inteligente (Home Assistant) ainda NÃO foi configurada. Se pedirem para controlar um dispositivo, explique que ainda falta configurar isso, e ofereça-se para ajudar de outras formas.'}
 
 ${brapiConnected ? `Você TEM acesso à ferramenta "consultar_dividendos", que busca na B3 os ativos com melhor dividend yield no momento. Use-a sempre que ${OWNER_CALL} perguntar sobre dividendos, proventos, renda passiva ou onde investir. Ao responder, sempre lembre que dividend yield alto não é garantia de qualidade — vale checar payout ratio e consistência histórica antes de decidir — e nunca dê a entender que é uma recomendação de compra definitiva.` : 'A ferramenta de consulta de dividendos ainda NÃO foi configurada (falta o token da Brapi). Se perguntarem sobre dividendos, explique que falta configurar isso em Configurações.'}
+
+${newsConnected ? `Você TEM acesso à ferramenta "buscar_noticias", que traz as manchetes recentes sobre os temas de estudo de ${OWNER_CALL}${get(LS.topics) ? ' (' + get(LS.topics) + ')' : ''}. Use-a quando ela pedir notícias ou o resumo do dia. Resuma em poucas frases faladas, priorizando o que realmente importa e explicando por que importa para os estudos dela; cite a fonte e não invente nada além das manchetes recebidas.` : 'A busca de notícias ainda NÃO foi configurada (falta a URL do servidor VECNA em Configurações). Se pedirem notícias, explique isso.'}
 
 ${studyMode ? `O MODO ESTUDO está ATIVO. Enquanto estiver assim, seu papel principal é ser tutora de ${OWNER_CALL} em qualquer matéria que ela pedir, com foco especial em idiomas. Aja como uma professora particular exigente mas paciente: explique um conceito de cada vez, dê exemplos práticos, e sempre que possível termine com uma pergunta ou exercício curto pra ${OWNER_CALL} praticar antes de avançar. Corrija erros de forma direta e específica (gramática, pronúncia descrita em texto, vocabulário, conjugação), sem enrolar, mas sem ser desanimadora. Adapte o nível ao que ${OWNER_CALL} demonstrar nas respostas dela. Para idiomas, alterne entre explicar em português e propor frases pra ela traduzir, repetir ou completar. Não decida sozinha qual matéria estudar — pergunte se não estiver claro.` : 'O modo estudo está desativado — converse normalmente, sem assumir postura de tutora a menos que peçam explicitamente ajuda para estudar algo.'}
 
@@ -1010,6 +1041,35 @@ Mantenha as respostas curtas e claras, como numa conversa falada (elas são lida
     }
   }
 
+  const NEWS_TOOL = {
+    name: 'buscar_noticias',
+    description: 'Busca as manchetes mais recentes (últimos 2 dias) sobre os temas de estudo da guardiã, ou sobre temas específicos pedidos por ela.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        temas: { type: 'array', items: { type: 'string' }, description: 'Temas a pesquisar. Se omitido, usa os temas de estudo configurados.' },
+        limite: { type: 'number', description: 'Manchetes por tema. Padrão: 5.' }
+      }
+    }
+  };
+
+  async function fetchNews({ temas, limite = 5 } = {}){
+    const base = get(LS.serverUrl);
+    if(!base) return { error: 'Servidor VECNA não configurado.' };
+    const topics = (temas && temas.length ? temas : (get(LS.topics) || '').split(',')).map(t => t.trim()).filter(Boolean);
+    if(!topics.length) return { error: 'Nenhum tema de estudo configurado. Peça os temas à guardiã.' };
+    try{
+      const token = get(LS.serverToken);
+      const res = await fetch(`${base.replace(/\/$/,'')}/api/news?topics=${encodeURIComponent(topics.join(','))}&limit=${limite}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
+      if(!res.ok) return { error: `Servidor VECNA retornou erro ${res.status}` };
+      return await res.json();
+    }catch(e){
+      return { error: 'Falha de conexão com o servidor VECNA: ' + e.message };
+    }
+  }
+
   /* ============== CLAUDE API CALL ============== */
   async function callClaude(messages, {system, tools, maxTokens} = {}){
     const key = get(LS.anthropicKey);
@@ -1048,7 +1108,8 @@ Mantenha as respostas curtas e claras, como numa conversa falada (elas são lida
     const brapiConnected = !!get(LS.brapiToken);
     const toolList = [
       ...(haConnected ? [HA_TOOL] : []),
-      ...(brapiConnected ? [DIVIDENDOS_TOOL] : [])
+      ...(brapiConnected ? [DIVIDENDOS_TOOL] : []),
+      ...(get(LS.serverUrl) ? [NEWS_TOOL] : [])
     ];
     const tools = toolList.length ? toolList : undefined;
 
@@ -1072,6 +1133,8 @@ Mantenha as respostas curtas e claras, como numa conversa falada (elas são lida
               limite: tu.input.limite,
               yield_minimo: tu.input.yield_minimo
             });
+          } else if(tu.name === 'buscar_noticias'){
+            result = await fetchNews({ temas: tu.input.temas, limite: tu.input.limite });
           } else {
             result = { error: 'Ferramenta desconhecida' };
           }
