@@ -42,3 +42,11 @@ Em ⚙ Configurações, cole a chave da ElevenLabs (elevenlabs.io → Developers
 masculina natural em qualquer celular. O Voice ID padrão é o da voz Adam; para trocar, copie o ID de outra voz de "My Voices".
 Em branco ou com erro (chave inválida, sem créditos, sem internet), o VECNA usa a voz do aparelho.
 Frases curtas e repetidas (como a saudação inicial) ficam em cache no aparelho e não gastam créditos de novo.
+
+## Memória de longo prazo (Supabase)
+
+O VECNA guarda fatos duradouros sobre você (gostos, rotinas, pessoas, estudos) e os usa nas conversas.
+O painel 🧠 lista tudo e permite apagar. As tabelas `vecna_memories` e `vecna_events` ficam no projeto Supabase
+"Vecna-memória", protegidas por RLS: só quem envia o cabeçalho `x-vecna-vault` com a chave correta (guardada no banco
+apenas como hash SHA-256) lê ou grava. Em ⚙, informe a URL do projeto, a chave **anon** (JWT, começa com `eyJ`) e a
+chave do cofre. Sem esses dados, a memória fica só no aparelho.
