@@ -89,6 +89,28 @@
   #hud-clock{ font-family:'Orbitron', system-ui, sans-serif; font-weight:500; font-size:clamp(34px, 9vw, 52px); letter-spacing:.06em; color:#8fd3ff; text-shadow:0 0 16px rgba(53,170,255,.55); font-variant-numeric:tabular-nums; line-height:1.1; }
   #hud-date{ font-family:'Rajdhani', system-ui, sans-serif; font-size:15px; color:#7fa9d6; }
   #hud-date::first-letter{ text-transform:uppercase; }
+
+  /* painéis laterais (só em telas largas) */
+  .side{ display:none; position:absolute; top:18px; width:270px; flex-direction:column; gap:14px; font-family:'Rajdhani', system-ui, sans-serif; z-index:1; }
+  #side-left{ left:24px; } #side-right{ right:24px; width:300px; }
+  @media (min-width:1100px) and (min-height:640px){ .side{ display:flex; } }
+  .sp{ position:relative; background:rgba(4,22,52,.58); border:1px solid rgba(60,170,255,.38); padding:12px 14px; backdrop-filter:blur(4px); color:#dcefff; }
+  .sp::before,.sp::after{ content:""; position:absolute; width:12px; height:12px; border:2px solid #35aaff; pointer-events:none; }
+  .sp::before{ top:-1px; left:-1px; border-right:0; border-bottom:0; }
+  .sp::after{ right:-1px; bottom:-1px; border-left:0; border-top:0; }
+  .sp h2{ font-size:15px; font-weight:600; letter-spacing:.1em; color:#8fd3ff; margin-bottom:8px; display:flex; align-items:center; gap:10px; }
+  .sp h2::after{ content:""; flex:1; height:1px; background:linear-gradient(90deg, rgba(60,170,255,.38), transparent); }
+  .sr{ display:flex; justify-content:space-between; gap:10px; padding:2px 0; font-size:15px; }
+  .sr span{ color:#7fa9d6; } .sr b{ font-weight:500; font-variant-numeric:tabular-nums; text-align:right; }
+  .sr b.bad{ color:#ff9a7a; } .sr b.good{ color:#58e0b0; }
+  .sbar{ height:3px; background:rgba(60,170,255,.18); margin:2px 0 6px; }
+  .sbar i{ display:block; height:100%; width:0; background:#35aaff; box-shadow:0 0 8px #35aaff; transition:width .5s; }
+  .wx{ display:flex; gap:14px; align-items:center; }
+  .temp{ font-family:'Orbitron', system-ui, sans-serif; font-size:36px; font-weight:500; line-height:1; }
+  .wx ul, .snews{ list-style:none; margin:0; padding:0; color:#7fa9d6; font-size:14px; }
+  .snews li{ padding:7px 0; border-top:1px solid rgba(60,170,255,.2); line-height:1.25; }
+  .snews li:first-child{ border-top:0; padding-top:0; }
+  .snews strong{ display:block; font-weight:600; font-size:15px; color:#dcefff; }
   .hud-panel{
     display:none;
     position:absolute; width:34%; font-size:0.55rem; line-height:1.4;
@@ -338,6 +360,37 @@
         <div class="hp-row"><span id="hp-amp-v">—</span><span>AMPLITUDE</span></div>
       </div>
     </div>
+
+    <aside class="side" id="side-left">
+      <section class="sp">
+        <h2>Sistema</h2>
+        <div class="sr"><span>Bateria</span><b id="sp-bat">n/d</b></div>
+        <div class="sbar"><i id="sp-bat-b"></i></div>
+        <div class="sr"><span>Quadros por segundo</span><b id="sp-fps">--</b></div>
+        <div class="sbar"><i id="sp-fps-b"></i></div>
+        <div class="sr"><span>Conexão</span><b id="sp-net">n/d</b></div>
+        <div class="sr"><span>Núcleos de CPU</span><b id="sp-cpu">n/d</b></div>
+        <div class="sr"><span>Memória do aparelho</span><b id="sp-mem">n/d</b></div>
+      </section>
+      <section class="sp">
+        <h2>Segurança</h2>
+        <div class="sr"><span>Sistema</span><b id="sp-arm">—</b></div>
+        <div class="sr"><span>Câmera</span><b id="sp-cam">—</b></div>
+        <div class="sr"><span>Casa inteligente</span><b id="sp-ha">—</b></div>
+        <div class="sr"><span>Voz</span><b id="sp-voz">—</b></div>
+      </section>
+    </aside>
+    <aside class="side" id="side-right">
+      <section class="sp">
+        <h2 id="sp-city">Paulínia</h2>
+        <div class="wx"><div class="temp" id="sp-temp">--°</div>
+          <ul><li id="sp-wx">carregando…</li><li id="sp-minmax"></li><li id="sp-rain"></li></ul></div>
+      </section>
+      <section class="sp">
+        <h2>Notícias</h2>
+        <ul id="sp-news" class="snews"><li><span>Configure a URL do servidor e os temas em ⚙.</span></li></ul>
+      </section>
+    </aside>
 
     <div id="hud-time">
       <p id="hud-hello">—</p>
@@ -603,6 +656,7 @@
   }
 
   /* ============== HUD ORB (esfera de partículas + anéis, estilo "VECNA HUD") ============== */
+  let fpsN = 0, fpsLast = 0;
   let orbCtx, orbCanvas, orbEnergy = 0.55, orbSpeaking = false, orbSp = 0;
   let starCanvas, starCtx, stars = [], starW = 0, starH = 0;
   const reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -636,6 +690,66 @@
     window.addEventListener('resize', resize);
     requestAnimationFrame(drawOrb);
     tickClock(); setInterval(tickClock, 1000);
+    initSidePanels();
+  }
+
+  /* ---------- painéis laterais ---------- */
+  const CITY = { nome:'Paulínia', lat:-22.76, lon:-47.15 };
+  const WX_CODES = { 0:'Céu limpo', 1:'Predomínio de sol', 2:'Parcialmente nublado', 3:'Nublado', 45:'Neblina', 48:'Neblina', 51:'Garoa', 53:'Garoa', 55:'Garoa forte', 61:'Chuva fraca', 63:'Chuva', 65:'Chuva forte', 80:'Pancadas de chuva', 81:'Pancadas de chuva', 82:'Pancadas fortes', 95:'Tempestade', 96:'Tempestade com granizo', 99:'Tempestade com granizo' };
+  const spEl = id => document.getElementById(id);
+  const setSp = (id, txt, cls) => { const e = spEl(id); e.textContent = txt; e.className = cls || ''; };
+
+  function updateSidePanels(){
+    setSp('sp-arm', isArmed() ? 'ARMADO' : 'DESARMADO', isArmed() ? 'good' : '');
+    const cam = document.getElementById('hp-cam-v').textContent;
+    setSp('sp-cam', cam === 'INATIVA' ? 'inativa' : cam.toLowerCase(), cam === 'INATIVA' ? 'bad' : 'good');
+    const ha = !!(get(LS.haUrl) && get(LS.haToken));
+    setSp('sp-ha', ha ? 'conectada' : 'não conectada', ha ? 'good' : 'bad');
+    setSp('sp-voz', ptVoice ? ptVoice.name.split(' ')[0] : 'padrão');
+    const c = navigator.connection;
+    setSp('sp-net', c ? ((c.effectiveType || 'online').toUpperCase() + (c.downlink ? ' · ' + c.downlink + ' Mb/s' : '')) : (navigator.onLine ? 'online' : 'offline'));
+  }
+
+  async function loadWeather(){
+    try{
+      const u = `https://api.open-meteo.com/v1/forecast?latitude=${CITY.lat}&longitude=${CITY.lon}&current=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=America%2FSao_Paulo&forecast_days=1`;
+      const d = await (await fetch(u)).json();
+      spEl('sp-temp').textContent = Math.round(d.current.temperature_2m) + '°C';
+      spEl('sp-wx').textContent = WX_CODES[d.current.weather_code] || '—';
+      spEl('sp-minmax').textContent = `Mín. ${Math.round(d.daily.temperature_2m_min[0])}° · máx. ${Math.round(d.daily.temperature_2m_max[0])}°`;
+      spEl('sp-rain').textContent = `Chuva hoje: ${d.daily.precipitation_probability_max[0]}%`;
+    }catch(e){ spEl('sp-wx').textContent = 'clima indisponível'; }
+  }
+
+  async function loadSideNews(){
+    const topics = (get(LS.topics) || '').split(',').map(t => t.trim()).filter(Boolean);
+    const list = spEl('sp-news');
+    if(!get(LS.serverUrl) || !topics.length) return;
+    const data = await serverCall(`/api/news?topics=${encodeURIComponent(topics.join(','))}&limit=3`);
+    if(data.error){ list.innerHTML = '<li><span>Notícias indisponíveis.</span></li>'; return; }
+    const items = [];
+    for(let i=0;i<3;i++) for(const t of topics) if(Array.isArray(data[t]) && data[t][i]) items.push(data[t][i]);
+    list.innerHTML = '';
+    if(!items.length){ list.innerHTML = '<li><span>Sem notícias no momento.</span></li>'; return; }
+    items.slice(0,5).forEach(n => {
+      const li = document.createElement('li');
+      const st = document.createElement('strong'); st.textContent = n.titulo.replace(/\s+-\s+[^-]+$/, '');
+      const sp = document.createElement('span'); sp.textContent = n.fonte;
+      li.append(st, sp); list.appendChild(li);
+    });
+  }
+
+  function initSidePanels(){
+    spEl('sp-city').textContent = CITY.nome;
+    spEl('sp-cpu').textContent = navigator.hardwareConcurrency ? navigator.hardwareConcurrency + ' núcleos' : 'n/d';
+    spEl('sp-mem').textContent = navigator.deviceMemory ? '~' + navigator.deviceMemory + ' GB' : 'n/d';
+    if(navigator.getBattery) navigator.getBattery().then(b => {
+      const up = () => { const pc = Math.round(b.level*100); spEl('sp-bat').textContent = pc + '%' + (b.charging ? ' (carregando)' : ''); spEl('sp-bat-b').style.width = pc + '%'; };
+      up(); b.addEventListener('levelchange', up); b.addEventListener('chargingchange', up);
+    }).catch(() => {});
+    updateSidePanels(); setInterval(updateSidePanels, 1500);
+    loadWeather(); setInterval(loadWeather, 30*60*1000);
+    loadSideNews(); setInterval(loadSideNews, 30*60*1000);
   }
 
   function tickClock(){
@@ -651,6 +765,11 @@
     const W = orbCanvas.width, dpr = W / orbCanvas.getBoundingClientRect().width || 1;
     if(!W){ requestAnimationFrame(drawOrb); return; }
     const t = (ms/1000) * orbSpeed;
+    fpsN++;
+    if(ms - fpsLast > 700){
+      const f = Math.round(fpsN*1000/(ms - fpsLast)); fpsN = 0; fpsLast = ms;
+      spEl('sp-fps').textContent = f; spEl('sp-fps-b').style.width = Math.min(100, f/60*100) + '%';
+    }
     const target = orbSpeaking ? 1 : Math.max(0, Math.min(1, (orbEnergy-0.55)/0.8));
     orbSp += (target - orbSp) * 0.12;
     const sp = orbSp;
