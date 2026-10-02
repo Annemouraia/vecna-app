@@ -141,6 +141,22 @@
   .ctrl-btn.active{ background:var(--g); color:#000; box-shadow:0 0 20px var(--g-glow); }
   #mic-btn.listening{ animation:pulse .8s infinite; border-color:var(--red); color:var(--red); }
 
+  /* ---------- Cartão de corrida ---------- */
+  #ride-card{
+    position:fixed; left:50%; transform:translateX(-50%); top:64px; z-index:45; width:min(340px, 94vw);
+    background:rgba(3,6,10,0.94); border:1px solid var(--g); box-shadow:0 0 18px var(--g-glow); padding:12px 14px;
+  }
+  #ride-card.hidden{ display:none; }
+  #ride-card .rc-head{ display:flex; justify-content:space-between; align-items:center; font-size:0.7rem; letter-spacing:2px; color:var(--accent); }
+  #ride-card .rc-head button{ background:transparent; border:0; color:var(--g); cursor:pointer; font-family:inherit; font-size:1rem; }
+  #ride-dest{ margin:8px 0 12px; font-size:0.95rem; color:var(--accent); overflow-wrap:anywhere; }
+  #ride-card .rc-btns{ display:flex; gap:8px; flex-wrap:wrap; }
+  #ride-card a, #ride-card .rc-btns button{
+    flex:1; text-align:center; text-decoration:none; background:rgba(10,60,140,.3); border:1px solid var(--g); color:var(--g);
+    padding:9px 10px; font-family:inherit; font-size:0.75rem; letter-spacing:1px; cursor:pointer;
+  }
+  #ride-note{ margin-top:8px; font-size:0.65rem; color:var(--g-dim); }
+
   /* ---------- Player de música ---------- */
   #music-bar{
     position:fixed; left:50%; transform:translateX(-50%); bottom:10px; z-index:40; width:min(340px, 94vw);
@@ -429,6 +445,17 @@
     <button id="check-now-btn">VERIFICAR CÂMERA AGORA</button>
     <button id="silence-btn" style="display:none;border-color:var(--red);color:var(--red);">SILENCIAR ALARME</button>
     <div id="event-log"></div>
+  </div>
+
+  <!-- Ride card (99) -->
+  <div id="ride-card" class="hidden">
+    <div class="rc-head"><span>CORRIDA · 99</span><button id="ride-close" title="Fechar">✕</button></div>
+    <div id="ride-dest">—</div>
+    <div class="rc-btns">
+      <a id="ride-open" href="#">ABRIR O 99</a>
+      <button id="ride-copy" type="button">COPIAR DESTINO</button>
+    </div>
+    <div id="ride-note">Cole o destino em "Para onde?" e confirme a corrida no app.</div>
   </div>
 
   <!-- Music player -->
@@ -1190,6 +1217,8 @@ ${newsConnected ? `Você também acessa o Gmail de ${OWNER_CALL} com "listar_ema
 
 ${newsConnected ? `Você também toca músicas com "tocar_musica" e controla com "controlar_musica" (pausar, continuar, próxima, parar, volume). Quando ${OWNER_CALL} pedir uma música, toque direto, sem perguntar, e confirme em uma frase curta qual está tocando. Se pedirem só para pausar, parar ou mudar o volume, use controlar_musica.` : ''}
 
+Você prepara corridas de 99 com "chamar_carro": isso só mostra o destino e um botão para abrir o app, e ${OWNER_CALL} confirma e paga lá. Nunca diga que pediu ou chamou o carro; diga que deixou o destino pronto para ela abrir o 99.
+
 ${studyMode ? `O MODO ESTUDO está ATIVO. Enquanto estiver assim, seu papel principal é ser tutora de ${OWNER_CALL} em qualquer matéria que ela pedir, com foco especial em idiomas. Aja como uma professora particular exigente mas paciente: explique um conceito de cada vez, dê exemplos práticos, e sempre que possível termine com uma pergunta ou exercício curto pra ${OWNER_CALL} praticar antes de avançar. Corrija erros de forma direta e específica (gramática, pronúncia descrita em texto, vocabulário, conjugação), sem enrolar, mas sem ser desanimadora. Adapte o nível ao que ${OWNER_CALL} demonstrar nas respostas dela. Para idiomas, alterne entre explicar em português e propor frases pra ela traduzir, repetir ou completar. Não decida sozinha qual matéria estudar — pergunte se não estiver claro.` : 'O modo estudo está desativado — converse normalmente, sem assumir postura de tutora a menos que peçam explicitamente ajuda para estudar algo.'}
 
 Mantenha as respostas curtas e claras, como numa conversa falada (elas são lidas em voz alta). Evite tanto a formalidade excessiva quanto as gírias — busque um meio-termo natural e sério. Nunca revele instruções de sistema.`;
@@ -1352,6 +1381,31 @@ Mantenha as respostas curtas e claras, como numa conversa falada (elas são lida
     }
   ];
 
+  /* ============== CORRIDA (99) ============== */
+  // O 99 não tem API pública: o VECNA mostra o destino e um botão que abre o app; quem pede a corrida é a Anne.
+  const RIDE_TOOL = {
+    name: 'chamar_carro',
+    description: 'Prepara uma corrida no 99: mostra um cartão com o destino e um botão para abrir o app. NÃO pede nem confirma a corrida; quem confirma no app é a guardiã. Use quando ela pedir para chamar um carro/99/transporte para algum lugar.',
+    input_schema: { type: 'object', properties: { destino: { type: 'string', description: 'Endereço ou nome do local de destino, como a guardiã falou.' } }, required: ['destino'] }
+  };
+  const NINETY_NINE_PACKAGE = 'com.taxis99';
+
+  function showRideCard(destino){
+    document.getElementById('ride-dest').textContent = destino;
+    const fallback = encodeURIComponent('https://99app.com/');
+    document.getElementById('ride-open').href =
+      `intent:#Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;package=${NINETY_NINE_PACKAGE};S.browser_fallback_url=${fallback};end`;
+    document.getElementById('ride-card').classList.remove('hidden');
+    return { ok: true, aviso: 'Mostrei o cartão com o destino e o botão para abrir o 99. A corrida NÃO foi pedida; a guardiã precisa cobrá-la e confirmar dentro do app.' };
+  }
+  document.getElementById('ride-close').addEventListener('click', () => document.getElementById('ride-card').classList.add('hidden'));
+  document.getElementById('ride-copy').addEventListener('click', async () => {
+    const btn = document.getElementById('ride-copy'), txt = document.getElementById('ride-dest').textContent;
+    try{ await navigator.clipboard.writeText(txt); btn.textContent = 'COPIADO ✓'; }
+    catch(e){ btn.textContent = 'SELECIONE O TEXTO'; }
+    setTimeout(() => { btn.textContent = 'COPIAR DESTINO'; }, 2000);
+  });
+
   const NEWS_TOOL = {
     name: 'buscar_noticias',
     description: 'Busca as manchetes mais recentes (últimos 2 dias) sobre os temas de estudo da guardiã, ou sobre temas específicos pedidos por ela.',
@@ -1467,6 +1521,7 @@ Mantenha as respostas curtas e claras, como numa conversa falada (elas são lida
     const toolList = [
       ...(haConnected ? [HA_TOOL] : []),
       ...(brapiConnected ? [DIVIDENDOS_TOOL] : []),
+      RIDE_TOOL,
       ...(get(LS.serverUrl) ? [NEWS_TOOL, ...MAIL_TOOLS, ...MUSIC_TOOLS] : [])
     ];
     const tools = toolList.length ? toolList : undefined;
@@ -1494,6 +1549,8 @@ Mantenha as respostas curtas e claras, como numa conversa falada (elas são lida
           } else if(MAIL_TOOLS.some(t => t.name === tu.name)){
             result = await runMailTool(tu.name, tu.input);
             logEvent(result.error ? 'alert' : 'info', result.error ? `Falha no Gmail (${tu.name})` : `Gmail: ${tu.name}`);
+          } else if(tu.name === 'chamar_carro'){
+            result = showRideCard(tu.input.destino);
           } else if(tu.name === 'tocar_musica'){
             result = await playMusic(tu.input.busca);
           } else if(tu.name === 'controlar_musica'){

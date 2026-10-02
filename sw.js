@@ -1,4 +1,4 @@
-const CACHE_NAME = 'vecna-cache-v9';
+const CACHE_NAME = 'vecna-cache-v10';
 const ASSETS = [
   './index.html',
   './manifest.json',
