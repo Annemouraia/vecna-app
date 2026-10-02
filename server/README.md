@@ -24,3 +24,14 @@ O VECNA **lê** seus emails e cria **rascunhos** de resposta. Ele nunca envia na
    O refresh token fica em `server/.google-token.json` (fora do git).
 
 Escopos pedidos: `gmail.readonly` e `gmail.compose`.
+
+## Música (YouTube)
+
+Peça "toca Legião Urbana" e o VECNA toca num player dentro do app (pausar, continuar, próxima, parar, volume).
+Funciona sem configuração extra, lendo a busca do YouTube. Se parar de funcionar, use a API oficial (grátis):
+
+1. Em https://console.cloud.google.com/apis/library/youtube.googleapis.com ative a **YouTube Data API v3**.
+2. Em Credenciais, crie uma **Chave de API**.
+3. Inicie o servidor com `YOUTUBE_API_KEY=sua-chave`.
+
+Alguns vídeos de gravadoras não permitem incorporação; nesse caso o VECNA tenta automaticamente o próximo resultado.

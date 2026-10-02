@@ -16,6 +16,7 @@ const TOKEN_FILE = path.join(__dirname, '.google-token.json');
 const SCOPES = 'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.compose';
 let oauthState = '';
 let access = { token: '', exp: 0 };
+const YT_KEY = process.env.YOUTUBE_API_KEY || '';
 const MIME = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.json': 'application/json',
   '.png': 'image/png', '.webmanifest': 'application/manifest+json'
@@ -41,6 +42,35 @@ async function fetchNews(topic, limit) {
     data: tag(item, 'pubDate'),
     link: tag(item, 'link')
   }));
+}
+
+// ---------- Música (YouTube) ----------
+// Com YOUTUBE_API_KEY usa a API oficial; sem ela, lê a página de resultados do YouTube (menos estável).
+async function searchMusic(q) {
+  if (YT_KEY) {
+    const u = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoEmbeddable=true&videoCategoryId=10&maxResults=5&q=${encodeURIComponent(q)}&key=${YT_KEY}`;
+    const res = await fetch(u);
+    const d = await res.json();
+    if (!res.ok) throw new Error(d.error?.message || `YouTube ${res.status}`);
+    return (d.items || []).map(i => ({ id: i.id.videoId, titulo: decode(i.snippet.title), canal: i.snippet.channelTitle }));
+  }
+  const res = await fetch('https://www.youtube.com/results?hl=pt-BR&search_query=' + encodeURIComponent(q), {
+    headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/124 Safari/537.36', 'Accept-Language': 'pt-BR,pt;q=0.9' }
+  });
+  if (!res.ok) throw new Error(`YouTube ${res.status}`);
+  const html = await res.text();
+  const out = [], seen = new Set();
+  const re = /"videoRenderer":\{"videoId":"([\w-]{11})"[\s\S]*?"title":\{"runs":\[\{"text":"((?:[^"\\]|\\.)*)"/g;
+  let m;
+  while ((m = re.exec(html)) && out.length < 5) {
+    if (seen.has(m[1])) continue;
+    seen.add(m[1]);
+    let titulo = m[2];
+    try { titulo = JSON.parse('"' + m[2] + '"'); } catch {}
+    out.push({ id: m[1], titulo, canal: '' });
+  }
+  if (!out.length) throw new Error('Nenhum resultado (o YouTube pode ter mudado a página; use YOUTUBE_API_KEY).');
+  return out;
 }
 
 // ---------- Gmail ----------
@@ -176,6 +206,11 @@ http.createServer(async (req, res) => {
         try { out[t] = await fetchNews(t, limit); } catch (e) { out[t] = { error: e.message }; }
       }));
       return send(res, 200, out);
+    }
+    if (url.pathname === '/api/music/search') {
+      const q = (url.searchParams.get('q') || '').trim().slice(0, 200);
+      if (!q) return send(res, 400, { error: 'informe q' });
+      try { return send(res, 200, await searchMusic(q)); } catch (e) { return send(res, 502, { error: e.message }); }
     }
     if (url.pathname.startsWith('/api/mail/')) {
       try {
