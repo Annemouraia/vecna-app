@@ -286,6 +286,16 @@
       <small>Escolha a voz instalada no seu aparelho.</small>
     </div>
     <div class="field">
+      <label>VOZ DE ESTÚDIO — CHAVE DA ELEVENLABS (opcional)</label>
+      <input type="password" id="in-eleven-key" placeholder="sk_...">
+      <small>Gera uma voz masculina natural, em qualquer celular. Crie a chave em elevenlabs.io (Developers → API Keys). Em branco = usa a voz do aparelho.</small>
+    </div>
+    <div class="field">
+      <label>ID DA VOZ (ElevenLabs)</label>
+      <input type="text" id="in-eleven-voice" placeholder="pNInz6obpgDQGcFmaJgB">
+      <small>Padrão: Adam (grave, masculina). Para outra, copie o Voice ID da voz que você adicionou em "My Voices".</small>
+    </div>
+    <div class="field">
       <label>TOM DE VOZ (mais baixo = mais grosso) — <span id="pitch-val">0.75</span></label>
       <input type="range" id="in-pitch" min="0.5" max="1.2" step="0.01" value="0.75" style="width:100%;">
       <small>Cuidado: tons muito baixos deixam a voz mais robótica. Ache o equilíbrio testando.</small>
@@ -487,6 +497,8 @@
     haUrl: 'vecna_ha_url',
     haToken: 'vecna_ha_token',
     brapiToken: 'vecna_brapi_token',
+    elevenKey: 'vecna_eleven_key',
+    elevenVoice: 'vecna_eleven_voice',
     serverUrl: 'vecna_server_url',
     serverToken: 'vecna_server_token',
     topics: 'vecna_topics',
@@ -517,6 +529,8 @@
     if(get(LS.haUrl)) document.getElementById('in-ha-url').value = get(LS.haUrl);
     if(get(LS.haToken)) document.getElementById('in-ha-token').value = get(LS.haToken);
     if(get(LS.brapiToken)) document.getElementById('in-brapi-token').value = get(LS.brapiToken);
+    document.getElementById('in-eleven-key').value = get(LS.elevenKey) || '';
+    document.getElementById('in-eleven-voice').value = get(LS.elevenVoice) || '';
     document.getElementById('in-server-url').value = get(LS.serverUrl) || '';
     document.getElementById('in-server-token').value = get(LS.serverToken) || '';
     document.getElementById('in-topics').value = get(LS.topics) || '';
@@ -560,7 +574,18 @@
   }
   speechSynthesis.onvoiceschanged = () => { populateVoiceSelect(); pickVoice(); };
 
-  document.getElementById('test-voice-btn').addEventListener('click', () => {
+  document.getElementById('test-voice-btn').addEventListener('click', async () => {
+    const testKey = document.getElementById('in-eleven-key').value.trim();
+    if(testKey){
+      const errEl = document.getElementById('setup-error');
+      errEl.textContent = 'Gerando voz de estúdio...';
+      try{
+        await speakEleven('Olá, Anne. Esta é a voz do VECNA. Se estiver do jeito que você quer, salve a configuração.',
+          { key: testKey, voice: document.getElementById('in-eleven-voice').value.trim(), cache: false });
+        errEl.textContent = '';
+      }catch(e){ errEl.textContent = 'Voz de estúdio falhou: ' + e.message; }
+      return;
+    }
     const sel = document.getElementById('in-voice');
     const voices = speechSynthesis.getVoices();
     const chosen = voices.find(v => v.name === sel.value);
@@ -587,6 +612,8 @@
     set(LS.haUrl, document.getElementById('in-ha-url').value.trim());
     set(LS.haToken, document.getElementById('in-ha-token').value.trim());
     set(LS.brapiToken, document.getElementById('in-brapi-token').value.trim());
+    set(LS.elevenKey, document.getElementById('in-eleven-key').value.trim());
+    set(LS.elevenVoice, document.getElementById('in-eleven-voice').value.trim());
     set(LS.serverUrl, document.getElementById('in-server-url').value.trim());
     set(LS.serverToken, document.getElementById('in-server-token').value.trim());
     set(LS.topics, document.getElementById('in-topics').value.trim());
@@ -907,9 +934,73 @@
   }
   pickVoice();
 
-  function say(text){
-    document.getElementById('vecna-say').textContent = text;
-    appendChat('vecna', text);
+  /* ---------- Voz de estúdio (ElevenLabs) ---------- */
+  const ELEVEN_DEFAULT_VOICE = 'pNInz6obpgDQGcFmaJgB'; // Adam
+  const ttsAudio = new Audio();
+  let ttsToken = 0, ttsAbort = null;
+
+  // Navegadores só deixam tocar áudio depois de um toque do usuário: libera no primeiro toque.
+  function unlockAudio(){
+    ttsAudio.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAABErAAABAAgAZGF0YQAAAAA=';
+    ttsAudio.play().catch(() => {}).finally(() => { ttsAudio.removeAttribute('src'); });
+  }
+  window.addEventListener('pointerdown', unlockAudio, { once:true });
+
+  function ttsHash(str){ let h = 5381; for(let i=0;i<str.length;i++) h = ((h<<5)+h+str.charCodeAt(i))|0; return (h>>>0).toString(36); }
+
+  async function elevenAudioBlob(text, key, voice, useCache){
+    const cacheKey = `https://vecna.local/tts/${voice}/${ttsHash(text)}`;
+    let cache = null;
+    if(useCache && 'caches' in window && text.length <= 300){
+      try{ cache = await caches.open('vecna-tts'); const hit = await cache.match(cacheKey); if(hit) return await hit.blob(); }catch(e){ cache = null; }
+    }
+    if(ttsAbort) ttsAbort.abort();
+    ttsAbort = new AbortController();
+    const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voice)}?output_format=mp3_44100_128`, {
+      method: 'POST',
+      signal: ttsAbort.signal,
+      headers: { 'xi-api-key': key, 'Content-Type': 'application/json', 'Accept': 'audio/mpeg' },
+      body: JSON.stringify({ text: text.slice(0, 1500), model_id: 'eleven_multilingual_v2', voice_settings: { stability: 0.5, similarity_boost: 0.75 } })
+    });
+    if(!res.ok){
+      let msg = `erro ${res.status}`;
+      try{ const j = await res.json(); msg = (j.detail && (j.detail.message || j.detail)) || msg; }catch(e){}
+      throw new Error(typeof msg === 'string' ? msg : `erro ${res.status}`);
+    }
+    const blob = await res.blob();
+    if(cache){ try{ await cache.put(cacheKey, new Response(blob, { headers:{ 'Content-Type':'audio/mpeg' } })); }catch(e){} }
+    return blob;
+  }
+
+  // Fala com a ElevenLabs. Resolve quando o áudio termina; rejeita se algo falhar antes de tocar.
+  async function speakEleven(text, opts = {}){
+    const key = opts.key || get(LS.elevenKey);
+    const voice = opts.voice || get(LS.elevenVoice) || ELEVEN_DEFAULT_VOICE;
+    const my = ++ttsToken;
+    ttsAudio.pause();
+    const blob = await elevenAudioBlob(text, key, voice, opts.cache !== false);
+    if(my !== ttsToken) return; // outra fala começou enquanto o áudio era gerado
+    const url = URL.createObjectURL(blob);
+    ttsAudio.src = url;
+    await new Promise((resolve, reject) => {
+      ttsAudio.onplaying = () => { if(opts.onStart) opts.onStart(); };
+      ttsAudio.onended = () => { URL.revokeObjectURL(url); resolve(); };
+      ttsAudio.onerror = () => { URL.revokeObjectURL(url); reject(new Error('não foi possível tocar o áudio')); };
+      ttsAudio.play().catch(reject);
+    });
+  }
+
+  function speechStarted(){ pulseOrb(1.3); orbSpeaking = true; duckMusic(true); }
+  function speechEnded(){
+    pulseOrb(0.55);
+    orbSpeaking = false;
+    duckMusic(false);
+    // Modo de conversa contínua: volta a ouvir automaticamente depois que o VECNA termina de falar.
+    // Pequeno atraso pra evitar que o microfone capture o final do próprio áudio do VECNA.
+    if(voiceConversationMode) setTimeout(startListening, 450);
+  }
+
+  function speakBrowser(text){
     if(!('speechSynthesis' in window)){
       if(voiceConversationMode) startListening(); // sem TTS, ainda assim volta a ouvir
       return;
@@ -920,17 +1011,27 @@
     if(ptVoice) u.voice = ptVoice;
     u.pitch = parseFloat(get(LS.pitch)) || 0.75;
     u.rate = parseFloat(get(LS.rate)) || 1.15;
-    u.onstart = () => { pulseOrb(1.3); orbSpeaking = true; duckMusic(true); };
+    u.onstart = speechStarted;
     u.onerror = () => { orbSpeaking = false; };
-    u.onend = () => {
-      pulseOrb(0.55);
-      orbSpeaking = false;
-      duckMusic(false);
-      // Modo de conversa contínua: volta a ouvir automaticamente depois que o VECNA termina de falar.
-      // Pequeno atraso pra evitar que o microfone capture o final do próprio áudio do VECNA.
-      if(voiceConversationMode) setTimeout(startListening, 450);
-    };
+    u.onend = speechEnded;
     speechSynthesis.speak(u);
+  }
+
+  function say(text){
+    document.getElementById('vecna-say').textContent = text;
+    appendChat('vecna', text);
+    if('speechSynthesis' in window) speechSynthesis.cancel();
+    if(get(LS.elevenKey)){
+      speakEleven(text, { onStart: speechStarted })
+        .then(() => speechEnded())
+        .catch(e => {
+          console.warn('Voz de estúdio falhou, usando a voz do aparelho:', e);
+          orbSpeaking = false;
+          speakBrowser(text);
+        });
+      return;
+    }
+    speakBrowser(text);
   }
 
   /* ============== STT (voice input) ============== */

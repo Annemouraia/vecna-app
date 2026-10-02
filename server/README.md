@@ -35,3 +35,10 @@ Funciona sem configuração extra, lendo a busca do YouTube. Se parar de funcion
 3. Inicie o servidor com `YOUTUBE_API_KEY=sua-chave`.
 
 Alguns vídeos de gravadoras não permitem incorporação; nesse caso o VECNA tenta automaticamente o próximo resultado.
+
+## Voz de estúdio (ElevenLabs, opcional)
+
+Em ⚙ Configurações, cole a chave da ElevenLabs (elevenlabs.io → Developers → API Keys) para o VECNA falar com uma voz
+masculina natural em qualquer celular. O Voice ID padrão é o da voz Adam; para trocar, copie o ID de outra voz de "My Voices".
+Em branco ou com erro (chave inválida, sem créditos, sem internet), o VECNA usa a voz do aparelho.
+Frases curtas e repetidas (como a saudação inicial) ficam em cache no aparelho e não gastam créditos de novo.
