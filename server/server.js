@@ -1,6 +1,7 @@
 // Servidor do VECNA (roda no PC de casa). Sem dependências — só Node 18+.
 //   node server/server.js
 // Variáveis opcionais: PORT (padrão 3000), VECNA_TOKEN (exige "Authorization: Bearer <token>" em /api/*)
+// Memória do VECNA: salva em server/.memory.json (compartilhada entre celular e PC).
 // Gmail: GOOGLE_CLIENT_ID e GOOGLE_CLIENT_SECRET (veja server/README.md). O VECNA só LÊ emails e cria RASCUNHOS.
 const http = require('http');
 const fs = require('fs');
@@ -151,6 +152,11 @@ async function createDraft({ to, subject, body, replyToId }) {
   return { ok: true, rascunhoId: d.id, aviso: 'Rascunho criado no Gmail. NÃO foi enviado.' };
 }
 
+// ---------- Memória compartilhada (celular + PC) ----------
+const MEM_FILE = path.join(__dirname, '.memory.json');
+const loadMem = () => { try { const m = JSON.parse(fs.readFileSync(MEM_FILE, 'utf8')); return Array.isArray(m) ? m : []; } catch { return []; } };
+const saveMem = m => fs.writeFileSync(MEM_FILE, JSON.stringify(m.slice(-150)), { mode: 0o600 });
+
 const readBody = req => new Promise((resolve, reject) => {
   let b = '';
   req.on('data', c => { b += c; if (b.length > 1e6) req.destroy(); });
@@ -211,6 +217,27 @@ http.createServer(async (req, res) => {
       const q = (url.searchParams.get('q') || '').trim().slice(0, 200);
       if (!q) return send(res, 400, { error: 'informe q' });
       try { return send(res, 200, await searchMusic(q)); } catch (e) { return send(res, 502, { error: e.message }); }
+    }
+    if (url.pathname === '/api/memory') {
+      if (req.method === 'POST') {
+        const d = await readBody(req).catch(() => ({}));
+        const texto = String(d.texto || '').trim().slice(0, 600);
+        if (!texto) return send(res, 400, { error: 'texto é obrigatório' });
+        const m = loadMem();
+        const id = String(d.id || Date.now().toString(36)).slice(0, 32);
+        if (!m.some(x => x.id === id)) m.push({ id, ts: Number(d.ts) || Date.now(), texto });
+        saveMem(m);
+        return send(res, 200, { ok: true, id });
+      }
+      return send(res, 200, loadMem());
+    }
+    if (url.pathname === '/api/memory/forget' && req.method === 'POST') {
+      const d = await readBody(req).catch(() => ({}));
+      const t = String(d.trecho || '').trim().toLowerCase();
+      if (!t) return send(res, 400, { error: 'trecho é obrigatório' });
+      const m = loadMem(), keep = m.filter(x => !x.texto.toLowerCase().includes(t));
+      saveMem(keep);
+      return send(res, 200, { ok: true, removidas: m.length - keep.length });
     }
     if (url.pathname.startsWith('/api/mail/')) {
       try {

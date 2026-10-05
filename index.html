@@ -1276,17 +1276,33 @@
     texto = String(texto || '').trim().slice(0, 600);
     if(!texto) return { error: 'texto vazio' };
     const m = loadMemory();
-    const item = { id: Date.now().toString(36), ts: Date.now(), texto };
+    const item = { id: Date.now().toString(36), ts: Date.now(), texto, pend: true };
     m.push(item);
     saveMemory(m);
+    if(get(LS.serverUrl)) serverCall('/api/memory', { id: item.id, ts: item.ts, texto }).then(r => { if(!r.error) markSynced(item.id); });
     return { ok: true, id: item.id };
+  }
+  function markSynced(id){
+    saveMemory(loadMemory().map(x => x.id === id ? { ...x, pend: undefined } : x));
   }
   function forgetMemory(trecho){
     const t = String(trecho || '').trim().toLowerCase();
     if(!t) return { error: 'informe o trecho' };
     const m = loadMemory(), keep = m.filter(x => !x.texto.toLowerCase().includes(t));
     saveMemory(keep);
+    if(get(LS.serverUrl)) serverCall('/api/memory/forget', { trecho });
     return { ok: true, removidas: m.length - keep.length };
+  }
+  // Sincroniza com o servidor do PC: sobe o que ficou pendente (offline) e adota a lista do servidor.
+  async function syncMemory(){
+    if(!get(LS.serverUrl)) return;
+    const stillPend = [];
+    for(const x of loadMemory().filter(x => x.pend)){
+      const r = await serverCall('/api/memory', { id: x.id, ts: x.ts, texto: x.texto });
+      if(r.error) stillPend.push(x);
+    }
+    const remote = await serverCall('/api/memory');
+    if(Array.isArray(remote)) saveMemory([...remote, ...stillPend.filter(x => !remote.some(r => r.id === x.id))]);
   }
   const MEMORY_TOOLS = [
     {
@@ -1625,6 +1641,7 @@ Mantenha as respostas curtas e claras, como numa conversa falada (elas são lida
   async function handleUserInput(text, image){
     appendChat('user', text, image && image.url);
     pulseOrb(1.0);
+    await syncMemory().catch(() => {});
     let history = loadHistory();
     history.push({ role: 'user', content: image
       ? [{ type: 'image', source: { type: 'base64', media_type: image.media_type, data: image.data } }, { type: 'text', text }]

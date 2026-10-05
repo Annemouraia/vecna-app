@@ -42,3 +42,9 @@ Em ⚙ Configurações, cole a chave da ElevenLabs (elevenlabs.io → Developers
 masculina natural em qualquer celular. O Voice ID padrão é o da voz Adam; para trocar, copie o ID de outra voz de "My Voices".
 Em branco ou com erro (chave inválida, sem créditos, sem internet), o VECNA usa a voz do aparelho.
 Frases curtas e repetidas (como a saudação inicial) ficam em cache no aparelho e não gastam créditos de novo.
+
+## Memória do VECNA (compartilhada)
+
+As anotações que o VECNA guarda (inclusive descrições das imagens que você envia) ficam em `server/.memory.json` no PC,
+e todo aparelho conectado ao servidor enxerga as mesmas memórias. Sem servidor configurado, a memória fica só no aparelho
+e é enviada ao servidor na próxima conversa em que ele estiver disponível.
