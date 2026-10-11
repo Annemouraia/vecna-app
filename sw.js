@@ -1,4 +1,4 @@
-const CACHE_NAME = 'vecna-cache-v13';
+const CACHE_NAME = 'vecna-cache-v14';
 const ASSETS = [
   './index.html',
   './manifest.json',
@@ -23,24 +23,20 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Network-first for the API and everything cross-origin; cache-first for our own shell.
+// Rede primeiro para o próprio site (evita servir versão velha); cache só como reserva offline.
+// Nunca intercepta chamadas a Anthropic / Supabase / Home Assistant / servidor VECNA.
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
-
-  // Never intercept calls to Anthropic / Supabase / Home Assistant — always go to network.
-  if (url.origin !== self.location.origin) {
+  if (event.request.method !== 'GET' || url.origin !== self.location.origin) {
     return;
   }
-
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      const fetchPromise = fetch(event.request)
-        .then((networkResponse) => {
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, networkResponse.clone()));
-          return networkResponse;
-        })
-        .catch(() => cached);
-      return cached || fetchPromise;
-    })
+    fetch(event.request)
+      .then((networkResponse) => {
+        const copy = networkResponse.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+        return networkResponse;
+      })
+      .catch(() => caches.match(event.request))
   );
 });
